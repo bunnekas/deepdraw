@@ -1,0 +1,10 @@
+torch
+torchvision
+torchaudio
+xformers
+webdataset
+wandb
+tqdm
+pyyaml
+matplotlib
+pillow

@@ -1,0 +1,70 @@
+airplane
+ambulance
+anvil
+barn
+beach
+bed
+bee
+binoculars
+bottlecap
+broccoli
+butterfly
+cactus
+cat
+chair
+circle
+clarinet
+cloud
+compass
+crayon
+cruise ship
+cup
+envelope
+fan
+firetruck
+flower
+frying pan
+giraffe
+grass
+hammer
+hedgehog
+helmet
+hexagon
+house
+hurricane
+ice cream
+laptop
+mailbox
+mountain
+mushroom
+nail
+oven
+pants
+pear
+peas
+pliers
+rabbit
+radio
+rainbow
+remote control
+rifle
+scissors
+screwdriver
+sea turtle
+skull
+skyscraper
+sleeping bag
+spider
+square
+squiggle
+squirrel
+stairs
+stitches
+sweater
+toe
+toothpaste
+tornado
+tractor
+tree
+waterslide
+windmill

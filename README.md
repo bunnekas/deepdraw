@@ -43,6 +43,11 @@ deepdraw/
 
 ## Key Components
 
+### Data Preprocessing
+We preprocess the raw version of the QickDraw dataset and convert the raw strokes stored as ndjson to shards of JPGs and archive them into tar files. In order to apply the DinoV2 or CLIP image encoder, we store each sketch as a 224x224 RGB image.
+
+![image info](./quickdraw_sample.png)
+
 ### Data Loading
 
 The `dataloader.py` module uses WebDataset to efficiently load sketch images from tar files. The data is stored in three directories:

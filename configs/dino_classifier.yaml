@@ -1,0 +1,35 @@
+# Random seed for reproducibility
+seed: 42
+
+# Data paths
+data:
+  train_dir: "/rwthfs/rz/cluster/work/lect0149/train"
+  test_dir: "/rwthfs/rz/cluster/work/lect0149/test"
+  zeroshot_dir: "/rwthfs/rz/cluster/work/lect0149/quickdraw_zeroshot"
+
+# Training parameters
+train:
+  batch_size: 128
+  epochs: 15
+  backbone_lr: 1e-5
+  classifier_lr: 1e-4
+  weight_decay: 1e-2
+  mixed_precision: true
+
+# Model configuration
+model:
+  type: "dinov2_vitl14_reg"
+  num_classes: 275
+  freeze_backbone: true
+  # freeze_blocks: 12
+
+# Logging configuration
+logging:
+  log_interval: 500
+  save_checkpoints: true
+
+# Wandb configuration
+wandb:
+  project: "DinoV2-Classifier"
+  group: "DeepDraw"
+  tags: ["dinov2", "sketch-classification"]
