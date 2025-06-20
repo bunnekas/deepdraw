@@ -2,6 +2,11 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.DS_Store
+
+# data files
+logs/wandb/
+outputs/
 
 # C extensions
 *.so
