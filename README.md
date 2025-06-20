@@ -1,14 +1,15 @@
 # Sketch-Classifier
 This repository contains a PyTorch pipeline for training a linear classifier on the Google QuickDraw dataset as part of the RWTH Deep Learning Lab 2025. We use state-of-the-art vision encoders like DinoV2 and CLIP as backbone, enabling a fine-tuning logic.
 
-# Project Structure
+## Project Structure
 
 ```
 deepdraw/
 ├── configs/                  # Configuration files
-│   ├── default.yaml          # Default configuration
+│   ├── dino_classifier.yaml  # Default configuration
 │   └── ...                   # Additional experiment configs
 ├── data/                     # Data loading code
+│   ├── preprocessing.py      # data conversion and sharding
 │   ├── dataloader.py         # WebDataset loader for tar files
 │   └── categories.txt        # Category labels
 ├── models/                   # Model definitions
@@ -117,7 +118,7 @@ The `trainer.py` module implements the training loop with:
 
 ### Configuration
 
-Edit the configuration file in `configs/default.yaml` to set your training parameters:
+Edit the configuration file in `configs/dino_classifier.yaml` to set your training parameters:
 
 ```yaml
 # Random seed for reproducibility
@@ -176,18 +177,13 @@ wandb:
 #SBATCH --output=logs/slurm/%j.out
 #SBATCH --error=logs/slurm/%j.err
 
-# Set environment variables for wandb
-export WANDB_DIR="$HOME/logs/wandb"
-mkdir -p $WANDB_DIR
-
 # Activate the virtual environment
 source $HOME/deepdraw/.venv/bin/activate
 
 # Run the training script
 python main.py \
-    --config configs/default.yaml \
+    --config configs/dino_classifier.yaml \
     --log_interval 500 \
-    --mixed_precision \
     --save_dir outputs \
     --checkpoint_frequency 5 \
     --num_workers 8
@@ -196,21 +192,6 @@ python main.py \
 2. Submit the job:
 ```bash
 sbatch jobs/batch_dinov2.sh
-```
-
-### Running Locally (for debugging)
-
-For local debugging without SLURM:
-
-```bash
-# Set environment variable to disable xformers on CPU
-export DINOV2_DISABLE_XFORMERS=1
-
-# Run with minimal settings
-python main.py \
-    --config configs/default.yaml \
-    --log_interval 10 \
-    --num_workers 0
 ```
 
 ## Monitoring Training

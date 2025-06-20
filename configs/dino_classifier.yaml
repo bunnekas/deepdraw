@@ -20,8 +20,11 @@ train:
 model:
   type: "dinov2_vitl14_reg"
   num_classes: 275
-  freeze_backbone: true
-  # freeze_blocks: 12
+  freeze_backbone: false
+  # freeze_blocks: 12      # Freeze first 12 blocks
+  # freeze_blocks: [0,1,2] # Freeze specific blocks
+  # freeze_blocks: "all"   # Freeze all blocks
+  # freeze_blocks: "none"  # Don't freeze any blocks
 
 # Logging configuration
 logging:
@@ -30,6 +33,6 @@ logging:
 
 # Wandb configuration
 wandb:
-  project: "DinoV2-Classifier"
+  project: "deepdraw"
   group: "DeepDraw"
   tags: ["dinov2", "sketch-classification"]
