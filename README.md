@@ -4,7 +4,7 @@ This repository contains a PyTorch pipeline for training a linear classifier on 
 ## Project Structure
 
 ```
-dinov2-classifier/
+deepdraw/
 ├── configs/                  
 │   ├── dino_classifier.yaml  # Default configuration
 │   └── ...                   # Additional experiment configs
