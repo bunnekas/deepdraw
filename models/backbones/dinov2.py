@@ -1,70 +1,95 @@
+import os
 import torch
+import torch.nn as nn
 import logging
 from typing import Tuple, Union, List
+from utils.utils import count_trainable_parameters, get_block_parameter_count
 
 logger = logging.getLogger(__name__)
 
-def load_dinov2(
-    freeze: bool = False,
-    freeze_blocks: Union[int, List[int], str] = None,
-    **kwargs
-) -> Tuple[torch.nn.Module, int]:
+def load_dinov2(freeze_blocks: Union[None, str, int, List[int], Tuple[int, int]] = None, **kwargs) -> Tuple[nn.Module, int]:
     """
     Load DinoV2 backbone with configurable freezing options.
     
     Args:
-        freeze: Whether to freeze the entire backbone
-        freeze_blocks: Specific blocks to freeze:
-            - int: Number of blocks to freeze from the start
-            - list: Specific block indices to freeze
-            - str: "all" to freeze all, "none" to freeze none
-        **kwargs: Additional arguments passed to the backbone
+        freeze_blocks: Controls which transformer blocks to freeze:
+            - None: Don't freeze any blocks (all trainable)
+            - "all": Freeze all blocks
+            - int: Freeze blocks from 0 to (freeze_blocks-1)
+            - list: List of specific block indices to freeze
+            - tuple: (start, end) to freeze blocks from start to end-1
+        **kwargs: Additional arguments passed to the model
         
     Returns:
         Tuple of (backbone, feature_dimension)
     """
     try:
+        # Check if running on CPU or GPU
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+        # If on CPU, use a patched version of the model that doesn't use xformers
+        if device.type == 'cpu' and os.environ.get("DINOV2_DISABLE_XFORMERS", "0") != "0":
+            logger.info("Running on CPU: Using standard attention instead of xformers")
+            # Set environment variable to disable xformers
+            os.environ["DINOV2_DISABLE_XFORMERS"] = "1"
+            
+        # Load the model
+        logger.info("Loading DinoV2 backbone...")
         backbone = torch.hub.load('facebookresearch/dinov2', 'dinov2_vitl14_reg')
         feature_dim = 1024
         
-        # Handle freezing logic
-        if freeze:
-            logger.info("Freezing entire DinoV2 backbone")
-            for param in backbone.parameters():
-                param.requires_grad = False
-        elif freeze_blocks is not None:
-            if isinstance(freeze_blocks, int):
-                # Freeze the first n blocks
-                block_indices = list(range(freeze_blocks))
-                logger.info(f"Freezing first {freeze_blocks} blocks of DinoV2 backbone")
-            elif isinstance(freeze_blocks, list):
-                # Freeze specific blocks
-                block_indices = freeze_blocks
-                logger.info(f"Freezing blocks {block_indices} of DinoV2 backbone")
-            elif freeze_blocks == "all":
+        # First, unfreeze all parameters to ensure we start from a clean state
+        for param in backbone.parameters():
+            param.requires_grad = True
+        
+        # Handle freezing based on the type of freeze_blocks
+        if freeze_blocks is not None:
+            if freeze_blocks == "all":
                 # Freeze all blocks
-                block_indices = list(range(24))  # DinoV2 has 24 blocks
-                logger.info("Freezing all blocks of DinoV2 backbone")
-            elif freeze_blocks == "none":
-                # Don't freeze any blocks
-                block_indices = []
-                logger.info("Not freezing any blocks of DinoV2 backbone")
+                for name, param in backbone.named_parameters():
+                    if 'blocks' in name:
+                        param.requires_grad = False
+                logger.info(f"Froze all blocks in DinoV2 backbone")
+            
+            elif isinstance(freeze_blocks, int):
+                # Freeze blocks from 0 to (freeze_blocks-1)
+                for name, param in backbone.named_parameters():
+                    for i in range(freeze_blocks):
+                        if f'blocks.{i}.' in name:
+                            param.requires_grad = False
+                logger.info(f"Froze blocks 0-{freeze_blocks-1} in DinoV2 backbone")
+            
+            elif isinstance(freeze_blocks, list):
+                # Freeze specific block indices
+                for name, param in backbone.named_parameters():
+                    for i in freeze_blocks:
+                        if f'blocks.{i}.' in name:
+                            param.requires_grad = False
+                logger.info(f"Froze blocks {freeze_blocks} in DinoV2 backbone")
+            
+            elif isinstance(freeze_blocks, tuple) and len(freeze_blocks) == 2:
+                # Freeze blocks from start to end-1
+                start, end = freeze_blocks
+                for name, param in backbone.named_parameters():
+                    for i in range(start, end):
+                        if f'blocks.{i}.' in name:
+                            param.requires_grad = False
+                logger.info(f"Froze blocks {start}-{end-1} in DinoV2 backbone")
             else:
-                raise ValueError(f"Invalid freeze_blocks value: {freeze_blocks}")
-                
-            # Apply freezing to specified blocks
-            for name, param in backbone.named_parameters():
-                should_freeze = any(f'blocks.{i}' in name for i in block_indices)
-                if should_freeze:
-                    param.requires_grad = False
-        else:
-            logger.info("DinoV2 backbone is fully trainable")
-            
-        # Log parameter status
-        trainable_params = sum(p.numel() for p in backbone.parameters() if p.requires_grad)
-        total_params = sum(p.numel() for p in backbone.parameters())
-        logger.info(f"DinoV2 backbone: {trainable_params:,} trainable parameters out of {total_params:,} total")
-            
+                logger.warning(f"Unrecognized freeze_blocks format: {freeze_blocks}. No blocks frozen.")
+        
+        # Count and log trainable parameters using the utility function
+        from utils.utils import count_trainable_parameters
+        trainable_params, total_params = count_trainable_parameters(backbone)
+        logger.info(f"{trainable_params:,} trainable parameters out of {total_params:,} total")
+        
+        # Optional: Print detailed block-by-block breakdown
+        if logger.isEnabledFor(logging.DEBUG):
+            from utils.utils import get_block_parameter_count
+            block_params = get_block_parameter_count(backbone)
+            for block_name, param_count in block_params:
+                logger.debug(f"{block_name}: {param_count:,} parameters")
+        
         return backbone, feature_dim
         
     except Exception as e:

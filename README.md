@@ -1,53 +1,45 @@
-# Sketch-Classifier
+# DeepDraw
 This repository contains a PyTorch pipeline for training a linear classifier on the Google QuickDraw dataset as part of the RWTH Deep Learning Lab 2025. We use state-of-the-art vision encoders like DinoV2 and CLIP as backbone, enabling a fine-tuning logic.
 
 ## Project Structure
 
 ```
-deepdraw/
-├── configs/                  # Configuration files
+dinov2-classifier/
+├── configs/                  
 │   ├── dino_classifier.yaml  # Default configuration
 │   └── ...                   # Additional experiment configs
-├── data/                     # Data loading code
+├── data/                     
 │   ├── preprocessing.py      # data conversion and sharding
 │   ├── dataloader.py         # WebDataset loader for tar files
 │   └── categories.txt        # Category labels
-├── models/                   # Model definitions
-│   ├── __init__.py           # Model registry exports
+├── models/                   
 │   ├── build_model.py        # Unified model construction
-│   ├── backbones/            # Feature extractors
-│   │   ├── __init__.py       # Backbone registry
-│   │   ├── dinov2.py         # DinoV2 backbone implementation
-│   │   └── clip.py           # CLIP backbone implementation
-│   └── classifiers/          # Classification heads
-│       ├── __init__.py       # Classifier registry
-│       ├── dino_classifier.py # DinoV2 classifier
-│       └── clip_classifier.py # CLIP classifier
-├── trainers/                 # Training code
+│   ├── backbones/            
+│   │   └── dinov2.py         # DinoV2 backbone implementation
+│   └── classifiers/          
+│       └── dino_classifier.py # DinoV2 classifier
+├── trainers/                 
 │   └── trainer.py            # Training loop and evaluation
-├── utils/                    # Utility functions
+├── utils/                    
 │   ├── utils.py              # General utilities
 │   └── logging_utils.py      # Logging functionality
-├── jobs/                     # SLURM batch scripts
-│   ├── batch_dinov2.sh       # DinoV2 training job
-│   └── batch_clip.sh         # CLIP training job
-├── logs/                     # Logs directory
+├── jobs/                     
+│   ├── batch_train.sh        # Job to start model training
+│   └── batch_zeroshot.sh     # Job to start zeroshot evaluation
+├── logs/                     
 │   ├── wandb/                # Weights & Biases logs
 │   └── slurm/                # SLURM output logs
-├── outputs/                  # Model outputs and checkpoints
+├── outputs/                 
 │   └── checkpoints/          # Periodic model checkpoints
-├── setup_env.sh              # Environment setup script
-├── verify_env.sh             # Environment verification script
-├── main.py                   # Main entry point
-└── README.md                 # This file
+├── train.py                  # Train and evaluate the model
+├── zeroshot.py               # Perform zeroshot evaluation
+└── README.md                 
 ```
 
 ## Key Components
 
 ### Data Preprocessing
 We preprocess the raw version of the QickDraw dataset and convert the raw strokes stored as ndjson to shards of JPGs and archive them into tar files. In order to apply the DinoV2 or CLIP image encoder, we store each sketch as a 224x224 RGB image.
-
-![image info](./quickdraw_sample.png)
 
 ### Data Loading
 
@@ -58,15 +50,13 @@ The `dataloader.py` module uses WebDataset to efficiently load sketch images fro
 
 ### Model Architecture
 
-The project uses a modular architecture with two main components:
+The project uses a modular architecture:
 
 1. **Backbones**: Feature extractors that convert images into embeddings
    - `dinov2.py`: Implements DinoV2 ViT-L/14 with configurable freezing
-   - `clip.py`: Implements CLIP ViT-L/14 with configurable freezing
 
 2. **Classifiers**: Classification heads that convert embeddings into class predictions
    - `dino_classifier.py`: Linear classifier for DinoV2 features
-   - `clip_classifier.py`: Linear classifier for CLIP features
 
 ### Model Construction
 
@@ -74,10 +64,10 @@ The `build_model.py` module provides a unified interface for constructing models
 
 ```python
 model = build_model(
-    backbone_name="dinov2_vitl14_reg",  # or "clip_vitl14"
+    backbone_name="dinov2_vitl14_reg",
     num_classes=275,
-    freeze_backbone=False,
-    freeze_blocks="all"  # or a number/list of block indices
+    freeze_backbone=True,
+    freeze_blocks="all"
 )
 ```
 
@@ -91,31 +81,6 @@ The `trainer.py` module implements the training loop with:
 
 ## Setting Up a Run
 
-### Environment Setup
-
-1. Clone the repository and navigate to the project directory:
-   ```bash
-   git clone <repository-url>
-   cd deepdraw
-   ```
-
-2. Set up the Python environment using the provided script:
-   ```bash
-   chmod +x setup_env.sh
-   ./setup_env.sh
-   ```
-
-3. Verify the environment:
-   ```bash
-   chmod +x verify_env.sh
-   ./verify_env.sh
-   ```
-
-4. Activate the environment:
-   ```bash
-   source .venv/bin/activate
-   ```
-
 ### Configuration
 
 Edit the configuration file in `configs/dino_classifier.yaml` to set your training parameters:
@@ -126,14 +91,15 @@ seed: 42
 
 # Data paths
 data:
-  train_dir: "/rwthfs/rz/cluster/work/lect0149/train"
-  test_dir: "/rwthfs/rz/cluster/work/lect0149/test"
-  zeroshot_dir: "/rwthfs/rz/cluster/work/lect0149/quickdraw_zeroshot"
+  train_dir: "/rwthfs/rz/cluster/hpcwork/lect0149/train"
+  test_dir: "/rwthfs/rz/cluster/hpcwork/lect0149/test"
+  num_workers: 8
+  prefatch_factor: 4
 
 # Training parameters
 train:
   batch_size: 128
-  epochs: 15
+  epochs: 6
   backbone_lr: 1e-5
   classifier_lr: 1e-4
   weight_decay: 1e-2
@@ -143,68 +109,63 @@ train:
 model:
   type: "dinov2_vitl14_reg"
   num_classes: 275
-  freeze_backbone: false
-  # freeze_blocks: 12      # Freeze first 12 blocks
-  # freeze_blocks: [0,1,2] # Freeze specific blocks
-  # freeze_blocks: "all"   # Freeze all blocks
-  # freeze_blocks: "none"  # Don't freeze any blocks
+  freeze_backbone: true
+  freeze_blocks: "all"
+
+# Wandb configuration
+wandb:
+  project: "DinoV2-Classifier-all-data"
+  group: "DeepDraw"
 
 # Logging configuration
 logging:
   log_interval: 500
   save_checkpoints: true
+  checkpoint_frequency: 1
+  name_appendix: 'frozen'
 
 # Wandb configuration
 wandb:
-  project: "deepdraw"
+  project: "DinoV2-Classifier-all-data"
   group: "DeepDraw"
   tags: ["dinov2", "sketch-classification"]
+
+# Paths
+paths:
+  save_dir: 'outputs'
 ```
 
 ### Running on SLURM
 
-1. Edit the batch script in `jobs/batch_dinov2.sh` to set your SLURM parameters:
+1. Edit the batch script in `jobs/batch_train.sh` to set your SLURM parameters:
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name=deepdraw
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=32G
+#SBATCH --job-name=dinov2_frozen
+#SBATCH --output=../logs/slurm/%x_%j.out
+#SBATCH --error=../logs/slurm/%x_%j.out
 #SBATCH --gres=gpu:1
-#SBATCH --time=24:00:00
-#SBATCH --output=logs/slurm/%j.out
-#SBATCH --error=logs/slurm/%j.err
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=32G
+#SBATCH --time=12:00:00
+#SBATCH --account=lect0149
 
-# Activate the virtual environment
-source $HOME/deepdraw/.venv/bin/activate
+### Load modules
+module purge
+module load GCCcore/11.3.0 Python/3.10.4 CUDA/12.6
 
-# Run the training script
-python main.py \
-    --config configs/dino_classifier.yaml \
-    --log_interval 500 \
-    --save_dir outputs \
-    --checkpoint_frequency 5 \
-    --num_workers 8
+### Activate virtual environment
+cd ..
+source .venv/bin/activate
+
+### Run your script
+python train.py --config configs/dinov2_classifier.yaml --name_appendix frozen
 ```
 
 2. Submit the job:
 ```bash
 sbatch jobs/batch_dinov2.sh
 ```
-
-## Monitoring Training
-
-Training progress can be monitored using Weights & Biases:
-
-1. Open the Weights & Biases dashboard in your browser
-2. Navigate to your project (default: "deepdraw")
-3. Key metrics to monitor:
-   - `train/loss` and `test/loss`: Training and test loss
-   - `train/accuracy` and `test/accuracy`: Training and test accuracy
-   - `charts/lr_backbone` and `charts/lr_classifier`: Learning rates
-   - `train/epoch_time` and `test/epoch_time`: Time per epoch
 
 ## Extending the Project
 

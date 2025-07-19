@@ -3,6 +3,8 @@ import logging
 import time
 from typing import Dict, Any, Optional
 import torch
+import torch.backends.cudnn
+torch.backends.cudnn.benchmark = True
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Optimizer
@@ -25,7 +27,7 @@ class Trainer:
         scheduler: _LRScheduler,
         metrics_logger: MetricsLogger,
         device: torch.device,
-        log_interval: int = 100,
+        log_interval: int = 500,
         mixed_precision: bool = True
     ):
         """
@@ -49,7 +51,7 @@ class Trainer:
         self.mixed_precision = mixed_precision and device.type == 'cuda' and torch.cuda.is_available()
         
         # Initialize mixed precision scaler if needed
-        self.scaler = torch.cuda.amp.GradScaler() if self.mixed_precision else None
+        self.scaler = torch.amp.GradScaler('cuda') if self.mixed_precision else None
         
         # Optimize CUDA operations
         if device.type == 'cuda':
@@ -95,10 +97,10 @@ class Trainer:
             total=steps_per_epoch,
             desc=f"Epoch {epoch+1}",
             disable=False,
-            mininterval=5.0,  # Update at most every 5 seconds
+            mininterval=30.0,
             bar_format='{desc}: {percentage:3.0f}%|{bar:10}{r_bar}',
             position=0,
-            leave=True
+            leave=True,
         )
         
         last_percentage = -1  # Track last logged percentage
@@ -114,7 +116,7 @@ class Trainer:
             self.optimizer.zero_grad()
             
             if self.mixed_precision:
-                with torch.cuda.amp.autocast():
+                with torch.amp.autocast('cuda'):
                     outputs = self.model(inputs)
                     loss = F.cross_entropy(outputs, labels)
                 
@@ -125,8 +127,8 @@ class Trainer:
             else:
                 outputs = self.model(inputs)
                 loss = F.cross_entropy(outputs, labels)
-                loss.backward()
-                self.optimizer.step()
+                self.scaler.scale(loss).backward() if self.scaler else loss.backward()
+                self.self.scaler.step(self.optimizer); self.scaler.update() if self.scaler else self.optimizer.step()
             
             # Update learning rate
             self.scheduler.step()
@@ -151,9 +153,9 @@ class Trainer:
                 metrics = {
                     'train/batch_loss': loss.item(),
                     'train/batch_accuracy': batch_accuracy,
-                    'charts/lr_backbone': backbone_lr,  # Updated path
-                    'charts/lr_classifier': classifier_lr,  # Updated path
-                    'charts/epoch': epoch + (batch_idx / steps_per_epoch)  # Consolidated epoch metric
+                    'charts/lr_backbone': backbone_lr,
+                    'charts/lr_classifier': classifier_lr,
+                    'charts/epoch': epoch + (batch_idx / steps_per_epoch)
                 }
                 
                 self.metrics_logger.log(metrics, step=step)
@@ -183,7 +185,7 @@ class Trainer:
             'train/loss': epoch_loss,
             'train/accuracy': epoch_accuracy,
             'train/epoch_time': epoch_time,
-            'charts/epoch': epoch  # Consolidated epoch metric
+            'charts/epoch': epoch
         }
         
         self.metrics_logger.log(metrics)
@@ -226,10 +228,10 @@ class Trainer:
             total=test_steps,
             desc="Evaluating",
             disable=False,
-            mininterval=5.0,  # Update at most every 5 seconds
+            mininterval=30.0,
             bar_format='{desc}: {percentage:3.0f}%|{bar:10}{r_bar}',
             position=0,
-            leave=True
+            leave=True,
         )
         
         last_percentage = -1  # Track last logged percentage
@@ -244,7 +246,7 @@ class Trainer:
                 
                 # Forward pass with mixed precision if enabled
                 if self.mixed_precision:
-                    with torch.cuda.amp.autocast():
+                    with torch.amp.autocast('cuda'):
                         outputs = self.model(inputs)
                         loss = F.cross_entropy(outputs, labels)
                 else:
@@ -278,8 +280,8 @@ class Trainer:
         metrics = {
             'test/loss': test_loss,
             'test/accuracy': test_accuracy,
-            'test/epoch_time': eval_time,  # Renamed for consistency
-            'charts/epoch': epoch  # Consolidated epoch metric
+            'test/epoch_time': eval_time,
+            'charts/epoch': epoch 
         }
         
         self.metrics_logger.log(metrics)
@@ -390,7 +392,7 @@ def train_model(
     steps_per_epoch: int,
     test_steps: Optional[int] = None,
     device: torch.device = None,
-    log_interval: int = 100,
+    log_interval: int = 500,
     save_path: Optional[str] = None,
     checkpoint_dir: Optional[str] = None,
     checkpoint_frequency: int = 5,

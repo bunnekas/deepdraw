@@ -1,10 +1,6 @@
 from .dino_classifier import DinoClassifier
-from .clip_classifier import ClipClassifier
 
-_CLASSIFIERS = {
-    "dinov2_vitl14_reg": DinoClassifier,
-    "clip_vitl14": ClipClassifier
-}
+_CLASSIFIERS = {"dinov2_vitl14_reg": DinoClassifier}
 
 def get_classifier(backbone_name, backbone, feature_dim, num_classes):
     if backbone_name not in _CLASSIFIERS:

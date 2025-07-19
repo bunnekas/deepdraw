@@ -1,0 +1,17 @@
+[INFO] Module GCCcore/11.3.0 loaded.
+[INFO] Module Python/3.10.4 loaded.
+[INFO] Module CUDA/12.6.3 loaded.
+2025-06-21 10:36:37 - utils.utils - INFO - Loaded config from configs/dinov2_classifier.yaml
+2025-06-21 10:36:37 - utils.utils - INFO - Configuration validated successfully
+2025-06-21 10:36:37 - utils.utils - INFO - Set random seed to 42 for all libraries
+2025-06-21 10:36:40 - utils.utils - INFO - Using device: cuda
+2025-06-21 10:36:40 - utils.utils - INFO - CUDA device: NVIDIA H100
+2025-06-21 10:36:40 - utils.utils - INFO - CUDA memory: 99.96 GB
+2025-06-21 10:36:40 - utils.utils - INFO - GPU environment configured for optimal performance
+2025-06-21 10:36:40 - __main__ - INFO - Loading datasets...
+2025-06-21 10:36:40 - data.dataloader - INFO - Found 221 tar files in /rwthfs/rz/cluster/work/lect0149/train
+2025-06-21 10:36:40 - data.dataloader - INFO - Loaded 275 categories from /rwthfs/rz/cluster/home/lect0149/deepdraw/data/categories_traintest.txt
+2025-06-21 10:36:40 - data.dataloader - INFO - Created dataloader with batch_size=128, num_workers=8
+2025-06-21 10:36:40 - data.dataloader - INFO - Found 54 tar files in /rwthfs/rz/cluster/work/lect0149/test
+2025-06-21 10:36:40 - data.dataloader - INFO - Loaded 275 categories from /rwthfs/rz/cluster/home/lect0149/deepdraw/data/categories_traintest.txt
+2025-06-21 10:36:40 - data.dataloader - INFO - Created dataloader with batch_size=256, num_workers=8

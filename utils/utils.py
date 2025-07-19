@@ -2,8 +2,9 @@ import os
 import random
 import logging
 import yaml
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 import torch
+import torch.nn as nn
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -95,20 +96,24 @@ def deep_merge(base_dict: Dict[str, Any], override_dict: Dict[str, Any]) -> Dict
     return result
 
 def get_device() -> torch.device:
-    """
-    Get the appropriate device for PyTorch operations.
+    """Get the appropriate device for PyTorch operations."""
+    # Check if we're on a login node or explicitly want CPU
+    if os.getenv('LOGIN_NODE', '0') == '1' or os.getenv('CUDA_VISIBLE_DEVICES', '') == '':
+        logger.info("Login node or no CUDA devices visible, using CPU")
+        return torch.device('cpu')
     
-    Returns:
-        torch.device: 'cuda' if available, otherwise 'cpu'
-    """
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    logger.info(f"Using device: {device}")
+    try:
+        if torch.cuda.is_available():
+            device_idx = torch.cuda.current_device()
+            device_name = torch.cuda.get_device_name(device_idx)
+            device = torch.device(f'cuda:{device_idx}')
+            logger.info(f"Using CUDA device {device_idx}: {device_name}")
+            return device
+    except Exception as e:
+        logger.warning(f"CUDA initialization failed: {str(e)}")
     
-    if device.type == 'cuda':
-        logger.info(f"CUDA device: {torch.cuda.get_device_name(0)}")
-        logger.info(f"CUDA memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
-        
-    return device
+    logger.info("Using CPU")
+    return torch.device('cpu')
 
 def setup_gpu_environment() -> None:
     """
@@ -171,3 +176,51 @@ def validate_config(config: Dict[str, Any]) -> None:
             raise ValueError(f"Missing required training parameter: {param}")
     
     logger.info("Configuration validated successfully")
+
+def count_trainable_parameters(model: nn.Module) -> Tuple[int, int]:
+    """
+    Count trainable and total parameters in a model.
+    
+    Args:
+        model: PyTorch model
+        
+    Returns:
+        Tuple of (trainable_params, total_params)
+    """
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    total_params = sum(p.numel() for p in model.parameters())
+    return trainable_params, total_params
+
+
+def get_block_parameter_count(backbone: nn.Module) -> List[Tuple[str, int]]:
+    """
+    Get parameter count for each block in the backbone.
+    
+    Args:
+        backbone: Model with block structure
+        
+    Returns:
+        List of (block_name, parameter_count) tuples
+    """
+    block_params = []
+    current_block = None
+    current_count = 0
+    
+    for name, param in backbone.named_parameters():
+        if 'blocks.' in name:
+            block_num = name.split('blocks.')[1].split('.')[0]
+            block_name = f"Block {block_num}"
+            
+            if current_block != block_name:
+                if current_block is not None:
+                    block_params.append((current_block, current_count))
+                current_block = block_name
+                current_count = 0
+                
+            current_count += param.numel()
+    
+    # Add the last block
+    if current_block is not None:
+        block_params.append((current_block, current_count))
+        
+    return block_params
